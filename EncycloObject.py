@@ -1,6 +1,7 @@
 from unidecode import unidecode
 from stanza.models.common.doc import Span
 import random
+import pandas as pd
 
 
 class Article:
@@ -164,10 +165,12 @@ class Book:
 
     def __getitem__(self, index):
         return self.articles[index]
-
+    
+    @classmethod
     def _sample(self, n):
         return random.sample(self.articles, n)
 
+    @classmethod
     def _reach_article(self, volume = None, numero  = None, headword=None):
         for art in self.articles:
             if headword:
@@ -176,3 +179,7 @@ class Book:
             elif art.volume == volume and art.numero == numero:
                 return art
         return None
+    
+    @classmethod
+    def _to_dataframe(self):
+        return pd.DataFrame([article.__dict__ for article in self])
