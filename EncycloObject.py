@@ -48,11 +48,13 @@ class Article:
         self.ncs = None
         self.nps = None
 
+        self.gold_qid = None
+        self.annotations = None
+
     def __repr__(self):
-        return hash
+        return self.hash
         # return f"Volume {self.volume} - Numero {self.numero} - Authors : {self.authors}\n{self.text}"
     
-    @classmethod
     def _apply_pipeline(self, pipeline, skip_headword=False):
         """
         Apply the provided pipeline to the Article.text
@@ -64,7 +66,7 @@ class Article:
         doc = pipeline(self.text[start_index:])
         return doc
     
-    @classmethod
+    
     def _enrich_stanzadoc(self):
         """
         We bring NER outputs into a Stanza doc :
@@ -166,11 +168,11 @@ class Book:
     def __getitem__(self, index):
         return self.articles[index]
     
-    @classmethod
+    
     def _sample(self, n):
         return random.sample(self.articles, n)
 
-    @classmethod
+    
     def _reach_article(self, volume = None, numero  = None, headword=None):
         for art in self.articles:
             if headword:
@@ -180,6 +182,6 @@ class Book:
                 return art
         return None
     
-    @classmethod
+    
     def _to_dataframe(self):
         return pd.DataFrame([article.__dict__ for article in self])
