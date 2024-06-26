@@ -28,6 +28,7 @@ class Article:
 
         self.hash = str(self.volume) + '/' + str(self.numero) + '/' + self.headword
         self.artfl  = 'https://artflsrv04.uchicago.edu/philologic4.7/encyclopedie0922/navigate/' + str(self.volume) + '/' + str(self.numero)
+        self.enccre = None
 
         # the parsing should be done with stanza
         # https://stanfordnlp.github.io/stanza/data_objects.html#parsetree
