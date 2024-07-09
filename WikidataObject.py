@@ -3,12 +3,13 @@ import json
 from geopy.distance import distance
 
 class WikidataObject:
-    def __init__(self, uri=None, jsondata=None, label=None, coordinates=None,
+    def __init__(self, uri=None, jsondata=None, label=None, desc = None, coordinates=None,
                  outgoing_edges=None, nb_statements=None, nb_sitelinks=None,
                  types=None, aliases=None):
         self.uri = self._process_uri(uri)
         self.label = label
         self.coordinates = coordinates
+        self.description = desc
         self.json = jsondata
         self.link = f'https://www.wikidata.org/wiki/{self.uri}' if self.uri else None
         self.outgoing_edges = outgoing_edges
@@ -101,6 +102,31 @@ class WikidataObject:
         # else :
         self.label = labels.get(lang, {}).get('value', None)
         return self.label
+    
+    def _get_description(self, lang='fr'):
+        """
+        default lang = fr
+        if a language is provided,
+            returns the description of the item in the given language
+        if lang='all',
+            returns a dict of all descriptions 
+        """
+        if self.description:
+            return self.description
+        
+        if not self.json:
+            self.json = self._request_json()
+        
+        entity_info = self.json.get('entities', {}).get(self.uri, {})
+        descriptions = entity_info.get('descriptions', {})
+
+        if lang == 'all':
+            self.description = {l: l_dict['value'] for l, l_dict in descriptions.items()}
+            return self.description
+        
+        # else :
+        self.description = descriptions.get(lang, {}).get('value', None)
+        return self.description
 
             
     def _get_outgoing_edges(self, include_p31=True, numeric=True):
@@ -326,3 +352,8 @@ class WikidataObject:
 
         return data
 
+
+if __name__ == '__main__' :
+    q1 = WikidataObject('Q42')
+    print(q1._get_description())
+    

@@ -7,3 +7,6 @@ The documents are represented by instances of `Article` class, grouped in a `Boo
 A Wikidata ressource is represented by `WikidataObject` instances.
 
  
+**TODO**
+
+- [ ] store a dict `{'lang': 'en', 'value': 'description'}` instead of 
