@@ -2,7 +2,7 @@ import requests
 import json
 from geopy.distance import distance
 
-class WikidataObject:
+class WikiDataObject:
     def __init__(self, uri=None, jsondata=None, label=None, desc = None, coordinates=None,
                  outgoing_edges=None, nb_statements=None, nb_sitelinks=None,
                  types=None, aliases=None):
@@ -51,32 +51,6 @@ class WikidataObject:
             print(f'Error requesting JSON at URL: {url}')
             print(e)
             return None
-
-    # def _get_label(self, lang='fr'):
-    #     """
-    #     default lang = fr
-    #     if a language is provide,
-    #         returns the label (one !) of the item in the given language
-    #     if lang='all',
-    #         returns a dict of all labels 
-    #     """
-    #     if self.label:
-    #         return self.label
-    #     if self.json:
-    #         if lang == 'all':
-    #             try:
-    #                 return self.json['entities'][self.uri]['labels']
-    #             except KeyError:
-    #                 pass
-    #         else:
-    #             try:
-    #                 return self.json['entities'][self.uri]['labels'][lang]['value']
-    #             except KeyError:
-    #                 pass
-    #     json_data = self._request_json()
-    #     if json_data:
-    #         return self._get_label()
-    #     return None
     
     def _get_label(self, lang='fr'):
         """
@@ -170,7 +144,6 @@ class WikidataObject:
                 print('Error getting outgoing edges:', e)
                 return None
         
-
     def _get_nb_statements(self):
         """
         Number of claims on the item
