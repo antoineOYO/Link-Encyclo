@@ -2,7 +2,7 @@ import requests
 import json
 from geopy.distance import distance
 
-class WikiDataObject:
+class WikidataObject:
     def __init__(self, uri=None, jsondata=None, label=None, desc = None, coordinates=None,
                  outgoing_edges=None, nb_statements=None, nb_sitelinks=None,
                  types=None, aliases=None):
