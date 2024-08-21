@@ -2,6 +2,9 @@ from unidecode import unidecode
 from stanza.models.common.doc import Span
 import random
 import pandas as pd
+import re
+
+from utils import *
 
 
 class Article:
@@ -68,27 +71,27 @@ class Article:
         return doc
     
     
-    def _enrich_stanzadoc(self):
+    def _enrich_stanzadoc(self, stopwords):
         """
-        We bring NER outputs into a Stanza doc :
-        - we add the NER tag to each `Token` instance of the Stanza doc
-        - we merge the contiguous tokens with the same NER into `Span` instances
+        We add NER tags to a Stanza doc :
+        - native `Token` instances of the Stanza doc receive the NER tags
+        - native `Span` instances of the Stanza doc receive the contiguous merged NER tags
 
         Returns the tuple (ncs, nps): 
-        - ncs, list[Span] --> represents the NC_Spatial entities
-        - nps, list[Span] --> represents the NP_Spatial entities
+        - ncs, list[Span] --> list of all NC Geographic Entities
+        - nps, list[Span] --> list of all NP Geographic Entities
         """
         if not self.parsed:
             print("parse the article first")
         if not self.ner:
             print("apply the NER pipeline first")
 
-        # 1st. we add the NER tag to each token
+        # 1st. we add the NER tag to each stanza.Token
         for token in self.parsed.iter_tokens():
             related_token_pieces = [tp for tp in self.ner if tp['start'] >= token.start_char \
                                     and tp['end'] <= token.end_char]
             if related_token_pieces:
-                token.ner = [token_piece['entity'] for token_piece in related_token_pieces][0]
+                token.ner = [token_piece['entity_group'] for token_piece in related_token_pieces][0]
             else:
                 token.ner = 'O'  # Assign 'O' (Outside) if no NER tag is found
         
@@ -97,7 +100,7 @@ class Article:
         spans = []
         list_tokens = [token for token in self.parsed.iter_tokens()]
         current_span = []
-        for i,token in enumerate(list_tokens):
+        for _,token in enumerate(list_tokens):
             # either we extend current_span
             if not current_span or token.ner == current_span[-1].ner:
                 current_span.append(token)
@@ -107,41 +110,45 @@ class Article:
                 spans.append(whole_span)
                 #print('span completed : ', whole_span.text, whole_span.type)    
                 current_span = [token]
-        ##############################################
+ 
         # we finally add the spans to the Stanza doc
         self.parsed.entities = spans
-        ##############################################
 
-        # 3rd. we keep only nouns in the first NC_Spatial entity
-        NC_pos = ['NOUN']
-        ##############################################
-        # Finnaly we also add 'PROPN' because I noticed that some nouns are tagged as 'PROPN'
-        # because they start with a capital letter 
-        # in the sample, 'Bourg', 'Isle', 'Ville' and others were tagged 'PROPN'
-        # for 'isle' we suspect a out-of-vocabulary issue :
-        # {"text": "isle", "upos": "X",}
-        NC_pos.append('PROPN')
+
+        # 3rd. we normalize the NP and NC entities using normalzing functions from utils.py
+        nps = [entity for entity in self.parsed.entities if entity.type == 'NP_Spatial']
+        nps = normalize_phrase(nps, pos=['NOUN', 'PROPN', 'ADJ'], stop_words=stopwords)
 
         ncs = [entity for entity in self.parsed.entities if entity.type == 'NC_Spatial']
+        ncs = normalize_phrase(ncs, pos=['NOUN', 'PROPN'], stop_words=stopwords)
+
+        # NC_pos = ['NOUN']
+        # NC_pos.append('PROPN')
+        # ncs = [entity for entity in self.parsed.entities if entity.type == 'NC_Spatial']
+
         nc1 = ncs[0] if ncs else None
-        nc1_ = " ".join(word.text for word in nc1.words if word.upos in NC_pos) if nc1 else None
-        if nc1_:
-            nc1_ = unidecode(nc1_).lower()
+        nc1_ = nc1.norm_text if nc1 else None
+        # if nc1_:
+        #     nc1_ = unidecode(nc1_).lower()
 
         # Find NP_Spatial entities
-        NP_pos = ['NOUN', 'PROPN', 'ADJ']
-        nps = [entity for entity in self.parsed.entities if entity.type == 'NP_Spatial']
-        fnp = [np for np in nps if nc1 and np.start_char > nc1.end_char] # NP after the 1st NC
+        # NP_pos = ['NOUN', 'PROPN', 'ADJ']
+        # nps = [entity for entity in self.parsed.entities if entity.type == 'NP_Spatial']
 
-        np1 = fnp[0] if len(fnp) > 0 else None
-        np1_ = " ".join(word.text for word in np1.words if word.upos in NP_pos) if np1 else None
-        if np1_:
-            np1_ = unidecode(np1_).lower()
+        # !! implementation of a rule :
+        # we're looking for the consecutive nps i.e. after the 1st NC !!
+        consecutive_nps = [np for np in nps if nc1 and np.start_char > nc1.end_char] # NP after the 1st NC
+        np1 = consecutive_nps[0] if len(consecutive_nps) > 0 else None
+        np1_ = np1.norm_text if np1 else None
+        # np1_ = " ".join(word.text for word in np1.words if word.upos in NP_pos) if np1 else None
+        # if np1_:
+        #     np1_ = unidecode(np1_).lower()
 
-        np2 = fnp[1] if len(fnp) > 1 else None
-        np2_ = " ".join(word.text for word in np2.words if word.upos in NP_pos) if np2 else None
-        if np2_:
-            np2_ = unidecode(np2_).lower()
+        np2 = consecutive_nps[1] if len(consecutive_nps) > 1 else None
+        np2_ = np2.norm_text if np2 else None
+        # np2_ = " ".join(word.text for word in np2.words if word.upos in NP_pos) if np2 else None
+        # if np2_:
+        #     np2_ = unidecode(np2_).lower()
 
         # Set attributes
         self.nc1 = nc1
@@ -159,9 +166,10 @@ class Article:
 class Book:
     def __init__(self, list_of_articles=None):
         self.articles = list_of_articles if list_of_articles is not None else []
+        #self.description = None
 
     def __repr__(self):
-        return f"Book with {len(self.articles)} articles"
+        return f"Book with {len(self.articles)}"# articles\n{self.description}"
     
     def __iter__(self):
         return iter(self.articles)
