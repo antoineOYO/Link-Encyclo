@@ -1,6 +1,6 @@
 import re
 from unidecode import unidecode
-from stanza.models.common.doc import Span
+from stanza.models.common.doc import Span, Token
 
 VOC_SAINT = f"sainte|saint|sant|san|st|s"
 def is_saint(phrase):
@@ -10,49 +10,56 @@ def is_saint(phrase):
     return bool(re.search(rf'\b({VOC_SAINT})\b', phrase))
 
 
-def normalize_phrase(nps, pos=['NOUN', 'PROPN', 'ADJ'], stop_words=None):
+def normalize_span(span, pos=['NOUN', 'PROPN', 'ADJ'], stop_words=None):
     """
     Input :
-    - nps : list of Stanza Span instances (stanza.models.common.doc.Span)
+    - span : Stanza Span instances (stanza.models.common.doc.Span)
     
     Normalizes Proper Nouns Phrases or Common Nouns Phrases by applying the following rules:
 
-    - Proper Nouns : remove tokens different from [NOUN, 'PROPN', 'ADJ']
-    - Common Nouns : remove tokens diffrent [NOUN, 'PROPN']
-        we also add 'PROPN' because some nouns ('Bourg', 'Isle', 'Ville') are tagged as 'PROPN'
-        other issue : for 'isle' we suspect a out-of-vocabulary issue :
+    - Proper Nouns Phrase : set pos=[NOUN, 'PROPN', 'ADJ'] to remove tokens diffrent [NOUN, 'PROPN', 'ADJ']
+    - Common Nouns Phrase : set pos=[NOUN, 'PROPN'] to remove tokens diffrent [NOUN, 'PROPN']
+        - for CNP we also add 'PROPN' because some nouns ('Bourg', 'Isle', 'Ville') are tagged as 'PROPN'
+        because they are capitalized
+        - other issue : for 'isle' we suspect a out-of-vocabulary issue :
         {"text": "isle", "upos": "X",}
-
     - detect if the phrase is a saint name and prepend 'saint' in that case        
     - apply lower(), unidecode() to each token
     - remove tokens in a list of stopwords to double-check
     - remove symbols and digits
 
     Output :
-    list of Stanza Span instances with attribute .norm_text
+    list of Stanza Span instances with new attribute .norm_text
+
     """
-    for np in nps:
-        norm_nps = []
 
-        # if pattern for VOC_SAINT is found, we delete it and prepend 'saint'
-        if is_saint(unidecode(np.text.lower())):
-            norm_nps = ['saint']
-            continue
-        
-        norm_nps.extend(
-            [
-                unidecode(word.text.lower()) for word in np.words \
-                    if word.upos in pos \
-                        and not is_saint(unidecode(word.text.lower()))                            
-            ]
-        )
-        norm_nps = [token for token in norm_nps if token not in stop_words]
+    norm_text = []
 
-        norm_nps = [re.sub(r'[^a-z\s]', '', token) for token in norm_nps]
-        norm_nps = ' '.join(norm_nps)
-        np.norm_text = norm_nps
-        #norm_nps.append(np)
-    return nps
+    # if pattern for VOC_SAINT is found, we prepend 'saint'
+    if is_saint(unidecode(span.text.lower())):
+        norm_text = ['saint']
+    
+    # keeping only tokens with the right POS
+    norm_text.extend(
+        [
+            unidecode(word.text.lower()) for word in span.words \
+                if word.upos in pos \
+                    and not is_saint(unidecode(word.text.lower()))                            
+        ]
+    )
+
+    # remove stopwords
+    norm_text = [token for token in norm_text if token not in stop_words]
+
+    # remove symbols and digits
+    norm_text = [re.sub(r'[^a-z\s]', '', token) for token in norm_text]
+
+    norm_text = ' '.join(norm_text)
+    
+    # adding the new attribute
+    span.norm_text = norm_text
+    #norm_nps.append(np)
+    return span
 
 # def normalize_NC(ncs, NC_pos=['NOUN', 'PROPN'], stop_words=None):
 #     """
