@@ -23,7 +23,6 @@ def normalize_span(span, pos=['NOUN', 'PROPN', 'ADJ'], stop_words=None):
         because they are capitalized
         - other issue : for 'isle' we suspect a out-of-vocabulary issue :
         {"text": "isle", "upos": "X",}
-    - detect if the phrase is a saint name and prepend 'saint' in that case        
     - apply lower(), unidecode() to each token
     - remove tokens in a list of stopwords to double-check
     - remove symbols and digits
@@ -35,30 +34,41 @@ def normalize_span(span, pos=['NOUN', 'PROPN', 'ADJ'], stop_words=None):
 
     norm_text = []
 
-    # if pattern for VOC_SAINT is found, we prepend 'saint'
-    if is_saint(unidecode(span.text.lower())):
-        norm_text = ['saint']
+    # # if pattern for VOC_SAINT is found, we prepend 'saint'
+    # if is_saint(unidecode(span.text.lower())):
+    #     norm_text = ['saint']
     
     # keeping only tokens with the right POS
     norm_text.extend(
         [
             unidecode(word.text.lower()) for word in span.words \
                 if word.upos in pos \
-                    and not is_saint(unidecode(word.text.lower()))                            
+                    #and not is_saint(unidecode(word.text.lower()))                            
         ]
     )
 
     # remove stopwords
     norm_text = [token for token in norm_text if token not in stop_words]
 
-    # remove symbols and digits
-    norm_text = [re.sub(r'[^a-z\s]', '', token) for token in norm_text]
+    # remove symbols like '-' 
+    norm_text = [re.sub(r'[^a-z\s]', ' ', token) for token in norm_text]
 
     norm_text = ' '.join(norm_text)
     
     # adding the new attribute
     span.norm_text = norm_text
-    #norm_nps.append(np)
+    
+    # special case : norm_text is empty
+    # in that case, after looking at these cases, we decide to keep the original text
+    # with 1 condtions : must not be a stopword
+    # this helped conserving ~700 NPs
+    if norm_text=='':
+        if unidecode(span.text.lower()) not in stop_words:
+            span.norm_text = unidecode(span.text.lower())
+    
+    if norm_text=='':
+        return None
+
     return span
 
 # def normalize_NC(ncs, NC_pos=['NOUN', 'PROPN'], stop_words=None):

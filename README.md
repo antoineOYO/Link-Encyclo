@@ -9,8 +9,9 @@ A Wikidata ressource is represented by `WikidataObject` instances.
  
 **TODO**
 
-- [ ] add a description string to a book, append it to _repr__
-- [ ] 
+- [X] add a description string to a book, append it to _repr__
+- [ ] revoir la fonction is_saint : on ne veut remplacer que les abbréviations
+- [ ] réordonner np1 et np2
 
 
 # Sources

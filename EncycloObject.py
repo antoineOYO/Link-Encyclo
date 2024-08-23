@@ -79,7 +79,7 @@ class Article:
         return doc
     
     
-    def _enrich_stanzadoc(self, stopwords):
+    def _enrich_stanzadoc(self):
         """
         We add NER tags to a Stanza doc :
         - native `Token` instances of the Stanza doc receive the NER tags
@@ -130,35 +130,37 @@ class Article:
         # we finally add the spans to the Stanza doc
         self.parsed.entities = stanza_spans
 
-    def _get_spatial_info(self, stopwords):
+    def _search_spatial_pattern(self, stopwords):
         """
-        Extracts the spatial information from the Stanza doc
+        Extracts the spatial pattern (if any) from the article-body.
+        by normalizing the Geographic Stanza Span 
+        Currently, the following pattern in searched :
+        ... NC_Spatial ... NP_Spatial ... NP_Spatial ...
+        Strings are stored in the corresponding attributes : nc1, np1, np2
 
         Returns the tuple (ncs, nps):
         - ncs, list[Span] --> list of all Common Nouns Geographic Entities
         - nps, list[Span] --> list of all proper Nouns Geographic Entities
-
-        the following pattern in searched :
-        ... NC_Spatial ... NP_Spatial ... NP_Spatial ...
-        stored in the corresponding attributes nc1, np1, np2
         """
 
         # we normalize the NP and NC entities using normalzing functions from utils.py
         nps = [entity_span for entity_span in self.parsed.entities if entity_span.type == 'NP_Spatial']
         nps = [normalize_span(span, pos=['NOUN', 'PROPN', 'ADJ'], stop_words=stopwords) for span in nps]
+        nps = [np for np in nps if np] # removing the None values
 
         ncs = [entity_span for entity_span in self.parsed.entities if entity_span.type == 'NC_Spatial']
-        ncs = normalize_span(ncs, pos=['NOUN', 'PROPN'], stop_words=stopwords)
+        ncs = [normalize_span(span, pos=['NOUN', 'PROPN'], stop_words=stopwords) for span in ncs]
+        ncs = [nc for nc in ncs if nc] # removing the None values
 
-        # !! we're looking for the 2 consecutive nps i.e. after the 1st NC !!
+        # PATTERN SEARCH
         nc1 = ncs[0] if ncs else None
         nc1_ = nc1.norm_text if nc1 else None
-
-        consecutive_nps = [np for np in nps if nc1 and np.start_char > nc1.end_char] # NP after the 1st NC
         
-        np1 = consecutive_nps[0] if len(consecutive_nps) > 0 else None
+        consecutive_nps = [np for np in nps if (nc1 and np) and np.start_char > nc1.end_char] #if (nc1 and nps) else None# NP after the 1st NC
+        
+        np1 = consecutive_nps[0] if  len(consecutive_nps) > 0 else None
         np1_ = np1.norm_text if np1 else None
-        np2 = consecutive_nps[1] if len(consecutive_nps) > 1 else None
+        np2 = consecutive_nps[1] if  len(consecutive_nps) > 1 else None
         np2_ = np2.norm_text if np2 else None
 
         # storing into the attributes
@@ -173,7 +175,7 @@ class Article:
 
         return ncs, nps
     
-
+from collections import Counter
 class Book:
     def __init__(self, list_of_articles=None):
         self.articles = list_of_articles if list_of_articles is not None else []
@@ -183,6 +185,7 @@ class Book:
         output = f"Book with {len(self.articles)} articles\n"
         if hasattr(self, 'description'):
             output += self.description
+        output += f"\nAttributes :\n{self[0].__dict__.keys()}"
         return output
     
     def __iter__(self):
@@ -205,6 +208,11 @@ class Book:
                 return art
         return None
     
+    def _make_counts(self):
+        all_nps = [np.norm_text for article in self for np in article.nps]
+        self.nps_counter = Counter(all_nps)
+        all_ncs = [nc.norm_text for article in self for nc in article.ncs]
+        self.ncs_counter = Counter(all_ncs)
     
     def _to_dataframe(self):
         return pd.DataFrame([article.__dict__ for article in self])
