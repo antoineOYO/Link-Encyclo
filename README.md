@@ -6,12 +6,14 @@ The documents are represented by instances of `Article` class, grouped in a `Boo
 
 A Wikidata ressource is represented by `WikidataObject` instances.
 
+- `raw2NP.ipynb` trims the raw articles down to triples (headĥrase, Proper Noun 1, Proper Noun 2)
+
  
 **TODO**
 
 - [X] add a description string to a book, append it to _repr__
 - [ ] revoir la fonction is_saint : on ne veut remplacer que les abbréviations
-- [ ] réordonner np1 et np2
+- [X] réordonner np1 et np2
 
 
 # Sources
