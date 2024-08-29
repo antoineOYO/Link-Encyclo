@@ -8,13 +8,16 @@ from utils import *
 
 
 class Article:
-    def __init__(self,
-                 volume = None,
-                 numero = None,
-                 headphrase = None,
-                 authors = None,
-                 text = None, # concatenated text of the paragraphs
-                 ):
+    def __init__(
+            self,
+            volume:int = None,
+            numero:int = None,
+            headphrase:str = None,
+            authors:str = None,
+            text:str = None, # concatenated text of the paragraphs
+            artfl:str = None,
+            #enccre:str = None,
+            ):
         """
         :param volume: volume number
         :param numero: article number
@@ -33,35 +36,42 @@ class Article:
         self.text = text
 
         self.hash = str(self.volume) + '/' + str(self.numero) + '/' + self.headphrase
-        self.artfl  = 'https://artflsrv04.uchicago.edu/philologic4.7/encyclopedie0922/navigate/' + str(self.volume) + '/' + str(self.numero)
-        self.enccre = None
+        if not artfl: # some mismatch remain between VOL/NUM and the ARTFL url ! 
+            self.artfl  = 'https://artflsrv04.uchicago.edu/philologic4.7/encyclopedie0922/navigate/'
+            self.artfl += str(self.volume) + '/' + str(self.numero)
 
-        # the parsing should be done with stanza
-        # https://stanfordnlp.github.io/stanza/data_objects.html#parsetree
-        # self.parsed should be the output of this parser
-        self.parsed = None
+        
+        # self.enccre = enccre
+        # if self.enccre :
+        #     self.enccre_link = 'http://enccre.academie-sciences.fr/encyclopedie/article/'
+        #     self.enccre_link += str(self.enccre)
 
-        # the NER should be done with custom NER method
-        # https://huggingface.co/GEODE/bert-base-french-cased-edda-ner 
-        # self.ner is the output of the model
-        self.ner = None
+        # # the parsing should be done with stanza
+        # # https://stanfordnlp.github.io/stanza/data_objects.html#parsetree
+        # # self.parsed should be the output of this parser
+        # self.parsed = None
 
-        # refer to the method _enrich_stanzadoc
-        self.nc1 = None
-        self.nc1_ = None
-        self.np1 = None
-        self.np1_ = None
-        self.np2 = None
-        self.np2_ = None
-        self.ncs = None
-        self.nps = None
+        # # the NER should be done with custom NER method
+        # # https://huggingface.co/GEODE/bert-base-french-cased-edda-ner 
+        # # self.ner is the output of the model
+        # self.ner = None
 
-        # if any
-        self.gold_qid = None
-        self.gold_coords = None
+        # # refer to the method _enrich_stanzadoc
+        # self.nc1 = None
+        # self.nc1_ = None
+        # self.np1 = None
+        # self.np1_ = None
+        # self.np2 = None
+        # self.np2_ = None
+        # self.ncs = None
+        # self.nps = None
 
-        # annotations can be the outputs of your Entity Linking experiences
-        self.annotations = None
+        # # if any
+        # self.gold_qid = None
+        # self.gold_coords = None
+
+        # # annotations can be the outputs of your Entity Linking experiences
+        # self.annotations = None
 
     def __repr__(self):
         return self.hash
@@ -77,9 +87,8 @@ class Article:
             start_index = len(self.headphrase)
         doc = pipeline(self.text[start_index:])
         return doc
-    
-    
-    def _enrich_stanzadoc(self):
+        
+    def _enrich_stanzadoc(self) -> tuple[list[Span], list[Span]]:
         """
         We add NER tags to a Stanza doc :
         - native `Token` instances of the Stanza doc receive the NER tags
@@ -130,7 +139,7 @@ class Article:
         # we finally add the spans to the Stanza doc
         self.parsed.entities = stanza_spans
 
-    def _search_spatial_pattern(self, stopwords):
+    def _search_spatial_pattern(self, stopwords) -> tuple[list[Span], list[Span]] :
         """
         Extracts the spatial pattern (if any) from the article-body.
         by normalizing the Geographic Stanza Span 
@@ -177,9 +186,14 @@ class Article:
     
 from collections import Counter
 class Book:
-    def __init__(self, list_of_articles=None):
+    def __init__(
+            self,
+            list_of_articles:list[Article] = None,
+            description:str = None
+            ):
+        
         self.articles = list_of_articles if list_of_articles is not None else []
-        #self.description = None
+        self.description = description
 
     def __repr__(self):
         output = f"Book with {len(self.articles)} articles\n"
@@ -199,12 +213,20 @@ class Book:
         return random.sample(self.articles, n)
 
     
-    def _reach_article(self, volume = None, numero  = None, headphrase=None):
+    def _reach_article(
+            self,
+            volume = None,
+            numero  = None,
+            headphrase=None,
+            enccre=None,
+            ) -> Article:
         for art in self.articles:
             if headphrase:
                 if art.headphrase.lower() == headphrase.lower():
                     return art
             elif art.volume == volume and art.numero == numero:
+                return art
+            elif art.enccre == enccre:
                 return art
         return None
     
@@ -214,5 +236,5 @@ class Book:
         all_ncs = [nc.norm_text for article in self for nc in article.ncs]
         self.ncs_counter = Counter(all_ncs)
     
-    def _to_dataframe(self):
+    def _to_dataframe(self) -> pd.DataFrame :
         return pd.DataFrame([article.__dict__ for article in self])

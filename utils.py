@@ -15,17 +15,16 @@ def normalize_span(span, pos=['NOUN', 'PROPN', 'ADJ'], stop_words=None):
     Input :
     - span : Stanza Span instances (stanza.models.common.doc.Span)
     
-    Normalizes Proper Nouns Phrases or Common Nouns Phrases by applying the following rules:
+    Normalizes these Spans by applying the following rules:
 
-    - Proper Nouns Phrase : set pos=[NOUN, 'PROPN', 'ADJ'] to remove tokens diffrent [NOUN, 'PROPN', 'ADJ']
-    - Common Nouns Phrase : set pos=[NOUN, 'PROPN'] to remove tokens diffrent [NOUN, 'PROPN']
-        - for CNP we also add 'PROPN' because some nouns ('Bourg', 'Isle', 'Ville') are tagged as 'PROPN'
-        because they are capitalized
-        - other issue : for 'isle' we suspect a out-of-vocabulary issue :
-        {"text": "isle", "upos": "X",}
-    - apply lower(), unidecode() to each token
-    - remove tokens in a list of stopwords to double-check
-    - remove symbols and digits
+    - if you want to normalize a Proper Noun Phrase, set `pos`=[NOUN, 'PROPN', 'ADJ'] to remove words tagged with other Part Of Speech
+    - if you want to normalize a Common Noun Phrase, set `pos`=[NOUN, 'PROPN'] to remove words tagged with other Part Of Speech
+        - 'PROPN' because some nouns ('Bourg', 'Isle', 'Ville') are times to times tagged as 'PROPN' (because they are capitalized ?)
+        - other issue still unremedied : for "isle" is tagged as "X" (out of vocabulary ?)
+    Then string normalization is applied :
+    - .lower(), unidecode() to each token
+    - stopwords are removed based on the list `stop_words` because the POS tagging is not perfect
+    - symbols and digits are removed
 
     Output :
     list of Stanza Span instances with new attribute .norm_text
@@ -71,47 +70,6 @@ def normalize_span(span, pos=['NOUN', 'PROPN', 'ADJ'], stop_words=None):
 
     return span
 
-# def normalize_NC(ncs, NC_pos=['NOUN', 'PROPN'], stop_words=None):
-#     """
-#     Input :
-#     - ncs : list of Stanza Span instances (stanza.models.common.doc.Span)
-    
-#     Normalizes **Noms Communs** Phrases by applying the following rules:
-#     - remove tokens not tagged as [NOUN, 'PROPN'] = NC_pos.
-#         we also add 'PROPN' because some nouns ('Bourg', 'Isle', 'Ville') are tagged as 'PROPN'
-#         other issue : for 'isle' we suspect a out-of-vocabulary issue :
-#             # {"text": "isle", "upos": "X",}
-#     - apply lower(), unidecode() to each token
-#     - remove tokens in a list of stopwords to ensure
-#     - remove symbols and digits
-
-#     Output :
-#     list of Stanza Span instances with attribute .norm_text
-#     """
-#     for np in ncs:
-#         norm_nps = []
-
-#         # if pattern for VOC_SAINT is found, we delete it and prepend 'saint'
-#         if is_saint(unidecode(np.text.lower())):
-#             norm_nps = ['saint']
-#             continue
-        
-#         norm_nps.extend(
-#             [
-#                 unidecode(word.text.lower()) for word in np.words \
-#                     if word.upos in NP_pos \
-#                         and not is_saint(unidecode(word.text.lower()))                            
-#             ]
-#         )
-#         norm_nps = [token for token in norm_nps if token not in stop_words]
-
-#         norm_nps = [re.sub(r'[^a-z\s]', '', token) for token in norm_nps]
-#         norm_nps = ' '.join(norm_nps)
-#         np.norm_text = norm_nps
-#         #norm_nps.append(np)
-#     return nps
-
-
 VOC_DETERMINANTS = f"les|l'|l|le|la|los"
 VOC_PREPOSITIONS = f"des|del|de|du|d'|d"
 VOC_SEPARATEURS = f"ou plûtôt|ou|aussi|et|autrement|&|on pourroit dire en françois"
@@ -144,4 +102,35 @@ def normalize_head(headphrase) :
         norm_head = 'saint ' + re.sub(rf'\b({VOC_SAINT})\b', ' ', norm_head)
         
     return norm_head
+
+
+from difflib import SequenceMatcher
+def string_similarity(
+        s1:str,
+        s2:str,
+        threshold:float = 0.95,
+        shorten:int = 50
+        )-> tuple[str,str,bool]:
+    """ 
+    Because ENCRRE's OCR and ARTFL's one have slight differences, we need to tolarate some differences.
+
+    Compares two input strings, shortened at the first 50 caracters (`shorten` setting)
+
+    Returns a tuple with the cleaned strings and a boolean indicating if they are similar enough
+    if short is True, inspects only the 100 first caracters of each string
+    """
+    # Cleaning the strings
+    s1_cleaned = unidecode(s1).lower().replace('\u200b', '').replace('\n', '')#.replace('  ', ' ').strip()
+    s2_cleaned = unidecode(s2).lower().replace('\u200b', '').replace('\n', '')#.replace('  ', ' ').strip()
+    s1_cleaned = re.sub(r'[^a-z\s]', '',s1_cleaned).replace('  ', ' ').strip()
+    s2_cleaned = re.sub(r'[^a-z\s]', '',s2_cleaned).replace('  ', ' ').strip()
+
+    if shorten :
+        s1_cleaned = s1_cleaned[: min(shorten,min(len(s1_cleaned), len(s2_cleaned)))]
+        s2_cleaned = s2_cleaned[: min(shorten,min(len(s1_cleaned), len(s2_cleaned)))]
+
+
+    similarity_ratio = SequenceMatcher(None, s1_cleaned, s2_cleaned).ratio()
+
+    return s1_cleaned, s2_cleaned, similarity_ratio >= threshold
 
